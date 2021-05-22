@@ -33,11 +33,12 @@ JNIEXPORT jstring JNICALL Java_com_coccoc_Tokenizer_segmentJson(JNIEnv *env,
 	{
 		std::string key = "/tokens/" + std::to_string(i) + "/";
 
-		rapidjson::Pointer((key + "originalStart").c_str()).Set(d, tokens[i].original_start);
-		rapidjson::Pointer((key + "originalEnd").c_str()).Set(d, tokens[i].original_end);
+		rapidjson::Pointer((key + "startPos").c_str()).Set(d, tokens[i].original_start);
+		rapidjson::Pointer((key + "endPos").c_str()).Set(d, tokens[i].original_end);
 		rapidjson::Pointer((key + "type").c_str()).Set(d, tokens[i].type);
 		rapidjson::Pointer((key + "segType").c_str()).Set(d, tokens[i].seg_type);
 		rapidjson::Pointer((key + "text").c_str()).Set(d, tokens[i].text.c_str());
+		rapidjson::Pointer((key + "splittedByDot").c_str()).Set(d, false);
 	}
 
 	// Serialize to Json
