@@ -21,7 +21,6 @@ if [ "${OS}" = "darwin" ]; then
 
 
 mkdir -p ${BUILD_DIR}/java
-${JAVA_HOME}/bin/javac -h ${BUILD_DIR}/java -d ${BUILD_DIR}/java ${SOURCE_DIR}/src/java/*.java
 
 g++ -shared -Wall -Werror -std=c++11 -Wno-deprecated -O3 -DNDEBUG -ggdb -fPIC \
 	-I ${SOURCE_DIR}/.. \
@@ -31,5 +30,3 @@ g++ -shared -Wall -Werror -std=c++11 -Wno-deprecated -O3 -DNDEBUG -ggdb -fPIC \
 	-I ${JAVA_HOME}/include/${OS} \
 	-o ${BUILD_DIR}/${OUTPUT_FILE} \
 	${SOURCE_DIR}/src/jni/Tokenizer.cpp
-
-jar -cf ${BUILD_DIR}/coccoc-tokenizer.jar -C ${BUILD_DIR}/java .

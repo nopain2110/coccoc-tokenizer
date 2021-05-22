@@ -1,64 +1,65 @@
-#include <jni.h>
-#include <iostream>
-#include <cstdint>
-#include <vector>
-#include <cassert>
-#include <tokenizer/tokenizer.hpp>
 #include "com_coccoc_Tokenizer.h"
+#include "rapidjson/document.h"
+#include "rapidjson/pointer.h"
+#include "rapidjson/stringbuffer.h"
+#include "rapidjson/writer.h"
+#include <tokenizer/tokenizer.hpp>
 
-JNIEXPORT jlong JNICALL Java_com_coccoc_Tokenizer_segmentPointer(
-	JNIEnv *env, jobject obj, jstring jni_text, jboolean for_transforming, jint tokenize_option, jboolean keep_puncts)
+/*
+ * Class:     com_coccoc_Tokenizer
+ * Method:    segmentJson
+ * Signature: (Ljava/lang/String;ZIZ)Ljava/lang/String;
+ */
+JNIEXPORT jstring JNICALL Java_com_coccoc_Tokenizer_segmentJson(JNIEnv *env,
+	jobject obj,
+	jstring jni_text,
+	jboolean for_transforming,
+	jint tokenize_option,
+	jboolean keep_puncts)
 {
-	// Use shared-memory instead of message-passing mechanism to transfer data to Java
-	// return a pointer to an array of pointers
+	// Use message-passing mechanism to transfer data to Java
+	// return a Json string
 
-	const jchar *jtext = env->GetStringCritical(jni_text, nullptr);
-	int text_length = env->GetStringLength(jni_text);
-	std::vector< uint32_t > *text = new std::vector< uint32_t >();
-	text->reserve(text_length);
+	const char *original_text = env->GetStringUTFChars(jni_text, NULL);
 
-	std::vector< int > original_pos;
-	Tokenizer::instance().normalize_for_tokenization(jtext, text_length, *text, original_pos, true);
-	env->ReleaseStringCritical(jni_text, jtext);
+	std::vector<FullToken> tokens = Tokenizer::instance().segment(original_text, for_transforming, tokenize_option, keep_puncts);
+	env->ReleaseStringUTFChars(jni_text, original_text);
 
-	// use pointer to avoid automatic deallocation
-	std::vector< Token > *ranges = new std::vector< Token >();
-	std::vector< int > *space_positions = new std::vector< int >();
+	// Serialize to json
+	rapidjson::Document d;
+	d.Parse("{\"tokens\": []}");
 
-	Tokenizer::instance().handle_tokenization_request< Token >(
-		*text, *ranges, *space_positions, original_pos, for_transforming, tokenize_option, keep_puncts);
-	for (size_t i = 0; i < ranges->size(); ++i)
+	for (size_t i = 0; i < tokens.size(); i++)
 	{
-		ranges->at(i).original_start += original_pos[ranges->at(i).normalized_start];
-		ranges->at(i).original_end += original_pos[ranges->at(i).normalized_end];
+		std::string key = "/tokens/" + std::to_string(i) + "/";
+
+		rapidjson::Pointer((key + "originalStart").c_str()).Set(d, tokens[i].original_start);
+		rapidjson::Pointer((key + "originalEnd").c_str()).Set(d, tokens[i].original_end);
+		rapidjson::Pointer((key + "type").c_str()).Set(d, tokens[i].type);
+		rapidjson::Pointer((key + "segType").c_str()).Set(d, tokens[i].seg_type);
+		rapidjson::Pointer((key + "text").c_str()).Set(d, tokens[i].text.c_str());
 	}
 
-	int64_t *res_pointer = new int64_t[8];
-	res_pointer[0] = (int64_t) text;
-	res_pointer[1] = (int64_t) text->data(); // pointer to normalized string
-	res_pointer[2] = (int64_t) ranges->size();
-	res_pointer[3] = (int64_t) ranges->data(); // pointer to raw data array inside vector
-	res_pointer[4] = (int64_t) ranges;	 // pointer to actual vector
-	res_pointer[5] = (int64_t) space_positions->size();
-	res_pointer[6] = (int64_t) space_positions->data();
-	res_pointer[7] = (int64_t) space_positions;
-	return (jlong) res_pointer;
+	// Serialize to Json
+	rapidjson::StringBuffer buffer;
+	rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
+	d.Accept(writer);
+
+	return env->NewStringUTF(buffer.GetString());
 }
 
-JNIEXPORT void JNICALL Java_com_coccoc_Tokenizer_freeMemory(JNIEnv *env, jobject obj, jlong res_pointer)
-{
-	// Cast each object pointer to their respective type, must be careful
-	int64_t *p = (int64_t *) res_pointer;
-	delete (std::vector< uint32_t > *) (p[0]);
-	delete (std::vector< Token > *) (p[4]);
-	delete (std::vector< int > *) (p[7]);
-	delete[](int64_t *) p;
-}
-
+/*
+ * Class:     com_coccoc_Tokenizer
+ * Method:    initialize
+ * Signature: (Ljava/lang/String;)I
+ */
 JNIEXPORT jint JNICALL Java_com_coccoc_Tokenizer_initialize(JNIEnv *env, jobject obj, jstring jni_dict_path)
 {
 	const char *dict_path = env->GetStringUTFChars(jni_dict_path, nullptr);
-	if (0 > Tokenizer::instance().initialize(std::string(dict_path))) return -1;
+
+	if (Tokenizer::instance().initialize(std::string(dict_path)) < 0) return -1;
+
 	env->ReleaseStringUTFChars(jni_dict_path, dict_path);
+
 	return 0;
 }
